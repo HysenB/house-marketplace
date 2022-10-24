@@ -1,5 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
+// Toastify
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // components
 import Navbar from './components/Navbar';
@@ -26,6 +29,8 @@ function App() {
       </Routes>
       <Navbar />
     </Router>
+
+      <ToastContainer/>
     </>
   );
 }
