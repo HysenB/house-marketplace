@@ -6,6 +6,7 @@ import {
     uploadBytesResumable,
     getDownloadURL,
 } from 'firebase/storage';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase.config';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -13,8 +14,9 @@ import { v4 as uuidv4 } from 'uuid';
 import Spinner from '../components/Spinner';
 
 function CreateListing() {
-    const [geolocationEnabled, setGeoLocationEnabled] = useState(true);
-    const [loading, setLoading] = useState(false);
+    // eslint-disable-next-line
+    const [geolocationEnabled, setGeolocationEnabled] = useState(true)
+    const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState({
         type: 'rent',
         name: '',
@@ -29,13 +31,27 @@ function CreateListing() {
         images: {},
         latitude: 0,
         longitude: 0,
-    });
+    })
 
-    const { type, name, bedrooms, bathrooms, parking, furnished, address, offer, regularPrice, discountedPrice, images, latitude, longitude } = formData
+    const {
+        type,
+        name,
+        bedrooms,
+        bathrooms,
+        parking,
+        furnished,
+        address,
+        offer,
+        regularPrice,
+        discountedPrice,
+        images,
+        latitude,
+        longitude,
+    } = formData
 
-    const auth = getAuth();
-    const navigate = useNavigate();
-    const isMounted = useRef(true);
+    const auth = getAuth()
+    const navigate = useNavigate()
+    const isMounted = useRef(true)
 
     useEffect(() => {
         if (isMounted) {
@@ -49,128 +65,144 @@ function CreateListing() {
         }
 
         return () => {
-            isMounted.current = false;
+            isMounted.current = false
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isMounted]);
+    }, [isMounted])
 
-    const onSubmit = async e => {
-        e.preventDefault();
+    const onSubmit = async (e) => {
+        e.preventDefault()
 
         setLoading(true)
 
         if (discountedPrice >= regularPrice) {
-            setLoading(false);
-            toast.error('Discounted price needs to be less than regular price');
-            return;
+            setLoading(false)
+            toast.error('Discounted price needs to be less than regular price')
+            return
         }
 
         if (images.length > 6) {
             setLoading(false)
-            toast.error('Max 6 images');
-            return;
+            toast.error('Max 6 images')
+            return
         }
 
-        let geolocation = {};
-        let location;
+        let geolocation = {}
+        let location
 
         if (geolocationEnabled) {
-            const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${address}&key=${process.env.REACT_APP_GEOCODE_API_KEY}`);
+            const response = await fetch(
+                `https://maps.googleapis.com/maps/api/geocode/json?address=${address}&key=${process.env.REACT_APP_GEOCODE_API_KEY}`
+            )
 
-            const data = await response.json();
+            const data = await response.json()
 
-            geolocation.lat = data.results[0]?.geometry.location.lat ?? 0;
-            geolocation.lng = data.results[0]?.geometry.location.lng ?? 0;
+            geolocation.lat = data.results[0]?.geometry.location.lat ?? 0
+            geolocation.lng = data.results[0]?.geometry.location.lng ?? 0
 
-            location = data.status === 'ZERO_RESULTS' ? undefined : data.results[0]?.formatted_address;
+            location =
+                data.status === 'ZERO_RESULTS'
+                    ? undefined
+                    : data.results[0]?.formatted_address
 
             if (location === undefined || location.includes('undefined')) {
-                setLoading(false);
-                toast.error('Please enter a correct address');
-                return;
+                setLoading(false)
+                toast.error('Please enter a correct address')
+                return
             }
         } else {
-            geolocation.lat = latitude;
-            geolocation.lng = longitude;
-            location = address;
+            geolocation.lat = latitude
+            geolocation.lng = longitude
         }
 
         // Store image in firebase
         const storeImage = async (image) => {
             return new Promise((resolve, reject) => {
-                const storage = getStorage();
+                const storage = getStorage()
                 const fileName = `${auth.currentUser.uid}-${image.name}-${uuidv4()}`
 
                 const storageRef = ref(storage, 'images/' + fileName)
 
-                const uploadTask = uploadBytesResumable(storageRef, image);
+                const uploadTask = uploadBytesResumable(storageRef, image)
 
-                uploadTask.on('state_changed',
+                uploadTask.on(
+                    'state_changed',
                     (snapshot) => {
-
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        console.log('Upload is ' + progress + '% done');
-
+                        const progress =
+                            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+                        console.log('Upload is ' + progress + '% done')
                         switch (snapshot.state) {
                             case 'paused':
-                                console.log('Upload is paused');
-                                break;
+                                console.log('Upload is paused')
+                                break
                             case 'running':
-                                console.log('Upload is running');
-                                break;
-                            default: break;
+                                console.log('Upload is running')
+                                break
+                            default:
+                                break
                         }
                     },
                     (error) => {
-                        reject(error);
+                        reject(error)
                     },
                     () => {
                         // Handle successful uploads on complete
                         // For instance, get the download URL: https://firebasestorage.googleapis.com/...
                         getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                            resolve(downloadURL);
-                        });
+                            resolve(downloadURL)
+                        })
                     }
-                );
+                )
             })
         }
 
-        const imgUrls = await Promise.all(
+        const imageUrls = await Promise.all(
             [...images].map((image) => storeImage(image))
         ).catch(() => {
             setLoading(false)
-            toast.error('Image not uploaded')
-            return;
+            toast.error('Images not uploaded')
+            return
         })
 
-        console.log(imgUrls);
-
-        setLoading(false);
-
-    }
-
-    const onMutate = e => {
-        let boolean = null;
-
-        if (e.target.value === 'true') {
-            boolean = true;
+        const formDataCopy = {
+            ...formData,
+            imageUrls,
+            geolocation,
+            timestamp: serverTimestamp(),
         }
 
+        formDataCopy.location = address
+        delete formDataCopy.images
+        delete formDataCopy.address
+        !formDataCopy.offer && delete formDataCopy.discountedPrice
+
+        const docRef = await addDoc(collection(db, 'listings'), formDataCopy)
+        setLoading(false)
+        toast.success('Listing saved')
+        navigate(`/category/${formDataCopy.type}/${docRef.id}`)
+    }
+
+    const onMutate = (e) => {
+        let boolean = null
+
+        if (e.target.value === 'true') {
+            boolean = true
+        }
         if (e.target.value === 'false') {
-            boolean = false;
+            boolean = false
         }
 
         // Files
         if (e.target.files) {
             setFormData((prevState) => ({
                 ...prevState,
-                images: e.target.files
+                images: e.target.files,
             }))
         }
 
         // Text/Booleans/Numbers
         if (!e.target.files) {
-            setFormData(prevState => ({
+            setFormData((prevState) => ({
                 ...prevState,
                 [e.target.id]: boolean ?? e.target.value,
             }))
