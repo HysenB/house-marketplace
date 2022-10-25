@@ -99,6 +99,8 @@ function Profile() {
         }
     }
 
+    const onEdit = (listingId) => navigate(`/edit-listing/${listingId}`)
+
     return <div className='profile'>
         <header className="profileHeader">
             <p className="pageHeader">My Profile</p>
@@ -137,7 +139,12 @@ function Profile() {
                     <p className="listingText">Your Listings</p>
                     <ul className="listingsList">
                         {listings.map((listing) => (
-                            <ListingItem onDelete={() => onDelete(listing.id)} key={listing.id} listing={listing.data} id={listing.id} />
+                            <ListingItem
+                                onDelete={() => onDelete(listing.id)}
+                                onEdit={() => onEdit(listing.id)}
+                                key={listing.id}
+                                listing={listing.data}
+                                id={listing.id} />
                         ))}
                     </ul>
                 </>
